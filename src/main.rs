@@ -1,27 +1,40 @@
 use clap::{Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::fs::{self};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::path::Path;
-// use std::thread;
-// use std::time::Duration;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Cli {
-    #[arg(short, long)]
-    name: String,
-
-    #[arg(short, long, default_value = "js")]
-    lang: String,
-
+struct Cli {    
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-    Init,
+    Fabricate{
+        #[arg(short=  'n', long)]
+        name: String,
+
+        #[arg(short = 'l', long, default_value = "js")]
+        lang: String,
+    },
+
+    Construct{
+        #[arg(short = 'n', long)]
+        name: String,
+    },
+
+    Assemble{
+        #[arg(short = 'n', long)]
+        name: String,
+    },
+
+    Ignite{
+        #[arg(short = 'n', long)]
+        name: String,
+    },
 }
 
 fn main() {
@@ -30,56 +43,118 @@ fn main() {
 
     let cli = Cli::parse();
 
-    if let Some(Commands::Init) = cli.command {
-        let project_name = cli.name;
-        let lang = cli.lang;
+    match cli.command {
+        Some(Commands::Fabricate { name, lang }) => {
+            let project_name = name.clone();
+            let lang = lang;
 
-        if lang != "js" && lang != "ts" {
-            eprintln!("Invalid language: {}. Supported values are 'js' or 'ts'.", lang);
-            std::process::exit(1);
+            if lang != "js" && lang != "ts" {
+                eprintln!("Invalid language: {}. Supported values are 'js' or 'ts'.", lang);
+                std::process::exit(1);
+            }
+
+            println!("Creating a new react-vite project: {}", project_name);
+
+            let bar = ProgressBar::new(4);
+            bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {msg}")
+                    .unwrap()
+                    .progress_chars("\u{2699} >-"),
+            );
+
+            bar.set_message("Setting up React with Vite...");
+            if let Err(e) = setup_frontend(&project_name, &lang) {
+                eprintln!("Failed to setup React with Vite: {}", e);
+                std::process::exit(1);
+            }
+            bar.inc(1);
+
+            bar.set_message("Installing dependencies...");
+            if let Err(e) = install_dependencies(&project_name) {
+                eprintln!("Failed to install dependencies for project '{}' :{}", project_name, e);
+                std::process::exit(1);
+            }
+            bar.inc(1);
+
+            bar.set_message("Installing TailwindCSS...");
+            if let Err(e) = setup_tailwind(&project_name, &lang) {
+                eprintln!("Failed to setup Tailwind: {}", e);
+                std::process::exit(1);
+            }
+            bar.inc(1);
+            
+
+            bar.finish_with_message("Project setup complete!");
+            println!("Navigate to '{}' to start building your project.", project_name);
+
         }
 
-        println!("Creating a new frontend project: {}", project_name);
+        // If Next.js setup is requested, set up Next.js + Express automatically
+        Some(Commands::Construct { name }) => {
 
-        let bar = ProgressBar::new(4);
-        bar.set_style(
-            ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {msg}")
-                .unwrap()
-                .progress_chars("\u{2699} >-"),
-        );
+            let bar = ProgressBar::new(4);
+            bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {msg}")
+                    .unwrap()
+                    .progress_chars("\u{2699} >-"),
+            );
 
-        bar.set_message("Setting up frontend...");
-        if let Err(e) = setup_frontend(&project_name, &lang) {
-            eprintln!("Failed to setup frontend: {}", e);
-            std::process::exit(1);
+            let project_name = name.clone();
+            bar.set_message("Setting up NextJs with Express...");
+            if let Err(e) = setup_nextjs(&project_name) {
+                eprintln!("Failed to setup NextJs: {}", e);
+                std::process::exit(1);
+            }
+            bar.inc(1);
+            
+        // Express will automatically be installed during Next.js setup
+            if let Err(e) = setup_expressjs(&project_name) {
+                eprintln!("Failed to setup ExpressJs during NextJs setup: {}", e);
+                std::process::exit(1);
+            }
+            bar.inc(1);
+            bar.finish_with_message("NextJs and ExpressJs setup complete!");
+            println!("Your full stack project is ready to go!");
+    }
+
+        // If only Express.js setup is requested
+        Some(Commands::Assemble { name }) => {
+            let bar = ProgressBar::new(1);
+            bar.set_style(
+                ProgressStyle::default_bar()
+                    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {msg}")
+                    .unwrap()
+                    .progress_chars("\u{2699} >-"),
+            );
+
+            let project_name = name.clone();
+            bar.set_message("Setting up ExpressJs...");
+            if let Err(e) = setup_expressjs(&project_name) {
+                eprintln!("Failed to setup ExpressJs: {}", e);
+                std::process::exit(1);
+            }
+            bar.inc(1);
+            bar.finish_with_message("ExpressJs setup complete!");
+            println!("Your ExpressJs project is ready to go!");
         }
-        bar.inc(1);
 
-        // Add a small delay to ensure project creation is complete
-        // thread::sleep(Duration::from_secs(2));
-
-        bar.set_message("Installing dependencies...");
-        if let Err(e) = install_dependencies(&project_name) {
-            eprintln!("Failed to install dependencies for project '{}' :{}",project_name, e);
-            std::process::exit(1);
+        Some(Commands::Ignite { name }) => {
+            let project_name = name.clone();
+            if let Err(e) = ignite_frontend(&project_name) {
+                eprintln!("Failed to ignite React with Vite: {}", e);
+                std::process::exit(1);
+            }
         }
-        bar.inc(1);
-
-        bar.set_message("Installing TailwindCSS...");
-        if let Err(e) = setup_tailwind(&project_name, &lang) {
-            eprintln!("Failed to setup Tailwind: {}", e);
-            std::process::exit(1);
-        }
-        bar.inc(1);
-
-        bar.finish_with_message("Project setup complete!");
-        println!("Navigate to '{}' to start building your project.", project_name);
+        None => {}
     }
 }
 
+
+
 fn setup_frontend(project_name: &str, lang: &str) -> Result<(), String> {
-    let lang_flag = if lang == "js" { "--template react-swc" } else { "--template react-ts-swc" };
+    let lang_flag = if lang == "js" { "--template react-swc" } else { "--template react-swc-ts" };
     let cmd = format!("npm create vite@latest {} -- {}", project_name, lang_flag);
     run_command(&cmd)
 }
@@ -192,6 +267,125 @@ plugins: [react(), tailwindcss()],
           }"#,
     )
     .map_err(|e| format!("Failed to write CSS file: {}", e))?;
+
+    Ok(())
+}
+
+fn ignite_frontend(project_name: &str) -> Result<(), String> {
+    let cmd = format!("cd {} && npm run dev", project_name);
+
+    println!("Starting the development server...");
+    println!("Command: {}", cmd);
+
+    // Spawn the command as a child process
+    let status = if cfg!(target_os = "windows") {
+        Command::new("cmd")
+            .args(["/C", &cmd])
+            .stdout(Stdio::inherit()) // Stream stdout
+            .stderr(Stdio::inherit()) // Stream stderr
+            .status() // Wait for the command to complete
+    } else {
+        Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .stdout(Stdio::inherit()) // Stream stdout
+            .stderr(Stdio::inherit()) // Stream stderr
+            .status() // Wait for the command to complete
+    };
+
+    // Check the result of the process execution
+    match status {
+        Ok(exit_status) if exit_status.success() => Ok(()),
+        Ok(exit_status) => Err(format!("Command exited with status: {}", exit_status)),
+        Err(err) => Err(format!("Failed to execute command: {}", err)),
+    }
+}
+
+fn setup_nextjs(project_name: &str) -> Result<(), String> {
+        // Install Nextjs dependencies
+        run_command(&format!(
+            "npx create-next-app@latest {}",
+            project_name
+        ))?;
+
+
+    let package_json_path = format!("{}/package.json", project_name);
+
+    fs::create_dir_all(&project_name).map_err(|e| format!("Failed to create package.json file: {}", e))?;    
+
+    fs::write(
+        package_json_path,
+        r#"{
+  "name": "my-nextjs-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "node server.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "next": "15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.1.6",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
+"#,)
+    .map_err(|e| format!("Failed to write package.json: {}", e))?;
+
+    Ok(())
+}
+
+fn setup_expressjs(project_name: &str) -> Result<(), String> {
+    // Install Express dependencies
+    run_command(&format!(
+        "cd {} && npm install express",
+        project_name
+    ))?;
+
+    let server_js_path = format!("{}/server.js", project_name);
+
+    fs::create_dir_all(Path::new(&server_js_path).parent().unwrap())
+        .map_err(|e| format!("Failed to create server.js: {}", e))?;
+
+    fs::write(
+        server_js_path,
+        r#"const express = require('express');
+const next = require('next');
+
+const dev = process.env.NODE_ENV !== 'production';
+const app = next({ dev });
+const handle = app.getRequestHandler();
+
+app.prepare().then(() => {
+  const server = express();
+
+  // Define your custom routes or middleware if necessary
+  server.get('*', (req, res) => {
+    return handle(req, res); // Let Next.js handle routing
+  });
+
+  // Start the server
+  server.listen(3000, (err) => {
+    if (err) throw err;
+    console.log('> Ready on http://localhost:3000');
+  });
+});
+"#)
+        .map_err(|e| format!("Failed to write server.js: {}", e))?;
 
     Ok(())
 }
