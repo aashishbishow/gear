@@ -1,5 +1,6 @@
 use indicatif::{ProgressBar, ProgressStyle};
 
+// Function to create a progress bar
 pub fn create_progress_bar() -> ProgressBar {
     let bar = ProgressBar::new(4);
     bar.set_style(

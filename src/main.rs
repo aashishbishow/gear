@@ -4,7 +4,8 @@ mod commands;
 
 
 use cli::{Commands, parse_cli};
-use crate::commands::assemble::{ignite_development, setup_react_vite, setup_tailwindcss};
+use crate::commands::assemble::{setup_react_vite, setup_tailwindcss};
+use crate::commands::ignite::ignite_development;
 use crate::commands::fabricate::setup_fabricate;
 use utils::{dependencies::check_dependencies, progress::create_progress_bar};
 

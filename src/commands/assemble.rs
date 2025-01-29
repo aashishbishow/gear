@@ -3,18 +3,6 @@ use crate::utils::executor::execute_or_exit;
 use std::fs;
 use indicatif::ProgressBar;
 
-
-
-// Function to ignite the development server
-pub fn ignite_development(project_name: &str) {
-    println!("Starting the development server...");
-    execute_or_exit(
-        run_command(&format!("cd {} && npm run dev", project_name)),
-        "Failed to start the development server.",
-    );
-}
-
-
 // Function to setup a react project with Vite
 pub fn setup_react_vite(project_name: &str, lang: &str, bar: &ProgressBar) -> Result<(), String> {
     bar.set_message("Creating a new React project with Vite...");
